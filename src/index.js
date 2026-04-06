@@ -8,6 +8,7 @@ const webhookRoutes = require('./routes/webhook');
 const authRouter = require('./routes/auth');
 const diasCerradosRouter = require('./routes/diasCerrados');
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -30,6 +31,7 @@ app.use('/reservas', reservasRouter);
 app.use('/', webhookRoutes);
 app.use('/auth', authRouter);
 
-app.listen(3000, () => {
-  console.log('Servidor corriendo en http://localhost:3000');
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
 });
