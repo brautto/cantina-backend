@@ -6,13 +6,11 @@ const sesiones = {};
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3000";
-
 const CARTA_RESTAURANTE_URL = "https://drive.google.com/file/d/1KebJTGplqlkmPLVdQXtUE0Ng-rBzX9sW/view?usp=drive_link";
 const CARTA_DELIVERY_URL    = "https://drive.google.com/file/d/16SKQvvIxHg5O4go4YX1U1cr8EdEOG0Gb/view?usp=drive_link";
 const LINK_MAPS = "https://maps.app.goo.gl/jU6JN69EJ97mU34D6";
-
 const ALIAS_MP = "cintiaale03";
-
+const { enviarNotificacionSenia } = require('./mailer');
 
 function calcularTurno(horaStr) {
   const [h, m] = horaStr.split(":").map(Number);
@@ -1146,6 +1144,19 @@ async function procesarReservaConSenia(from, sesion) {
       estado_inicial: "pendiente_senia",
     });
 
+    // Notificar por email a recepción
+    try {
+      await enviarNotificacionSenia({
+        nombre,
+        fecha,
+        cantidad_personas,
+        monto: cantidad_personas * (process.env.MONTO_SENIA_POR_PERSONA || 10000),
+        telefono: telefonoNorm,
+      });
+    } catch (mailErr) {
+      console.error("[mailer] Error al enviar notificación:", mailErr.message);
+    }
+
     const fechaDisplay = formatearFecha(fecha);
     resetearSesion(sesion);
 
@@ -1158,9 +1169,9 @@ async function procesarReservaConSenia(from, sesion) {
   } catch (err) {
     const status = err.response?.status;
     const msg    = err.response?.data?.error || "";
-  
+
     console.error("[BOT procesarReservaConSenia]", status, msg);
-  
+
     if (status === 400 && msg.includes("Límite")) {
       await enviarMensajeTexto(
         from,
@@ -1179,7 +1190,7 @@ async function procesarReservaConSenia(from, sesion) {
         "Hubo un problema al registrar tu reserva. Por favor comunicate directamente con el restaurante al *+54 9 2262 518504*."
       );
     }
-  
+
     resetearSesion(sesion);
   }
 }
