@@ -845,5 +845,51 @@ router.patch('/:id/asignar-mesa', async (req, res) => {
   }
 });
 
+// ── PATCH /:id/finalizar ──────────────────────────────────────────────────────
+router.patch('/:id/finalizar', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'ID de reserva inválido' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `SELECT id, estado FROM reserva WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+
+    if (result.rows[0].estado !== 'en_turno') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Solo se pueden finalizar reservas en estado en_turno' });
+    }
+
+    const updateResult = await client.query(
+      `UPDATE reserva SET estado = 'finalizada', mesa_id = NULL WHERE id = $1 RETURNING *`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+    return res.status(200).json({
+      ok: true,
+      mensaje: 'Mesa liberada correctamente',
+      reserva: updateResult.rows[0]
+    });
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error('[PATCH /reservas/:id/finalizar]', err);
+    return res.status(500).json({ error: 'Error al finalizar la reserva' });
+  } finally {
+    client.release();
+  }
+});
 
 module.exports = router;
