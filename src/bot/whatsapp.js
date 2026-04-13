@@ -7,8 +7,8 @@ const sesiones = {};
 // ─── Constantes ─────────────────────────────────────────────────────────────
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3000";
 
-const CARTA_RESTAURANTE_URL = "https://LINK_CARTA_RESTAURANTE"; // reemplazar
-const CARTA_DELIVERY_URL    = "https://drive.google.com/drive/folders/1roLmw_5jYDethgmO2XlNTBGfmDoMFy2Y";
+const CARTA_RESTAURANTE_URL = "https://drive.google.com/file/d/1KebJTGplqlkmPLVdQXtUE0Ng-rBzX9sW/view?usp=drive_link";
+const CARTA_DELIVERY_URL    = "https://drive.google.com/file/d/16SKQvvIxHg5O4go4YX1U1cr8EdEOG0Gb/view?usp=drive_link";
 const LINK_MAPS = "https://maps.app.goo.gl/jU6JN69EJ97mU34D6";
 
 const ALIAS_MP = "cintiaale03";
@@ -431,8 +431,8 @@ async function manejarMensajeEntrante(message) {
       if (cierres.includes("todo")) {
         await enviarMensajeTexto(
           from,
-          `Lo sentimos, el restaurante no abre el *${textoOriginal}* 😔.\n\n` +
-          `Por favor ingresá otra fecha.`
+          `Lo sentimos, el restaurante permanecerá cerrado el *${textoOriginal}* 😔.\n\n` +
+          `Por favor elegí otra fecha.`
         );
         return;
       }
@@ -481,51 +481,45 @@ async function manejarMensajeEntrante(message) {
     const turno = calcularTurno(horaFormateada);
     const turnoLabel = calcularTurnoLabel(turno);
 
-    // ── VERIFICAR TURNO CERRADO ─────────────────────────────────────────────
+    // ── VERIFICAR TURNO CERRADO ─────────────────────────────────────────────────
     const cierresDia = sesion.datos.cierresDia || [];
 
     if (turno === "maniana" && cierresDia.includes("maniana")) {
       if (cierresDia.includes("noche")) {
-        // Ambos cerrados (no debería llegar acá porque lo cortamos en reserva_fecha, pero por las dudas)
         await enviarMensajeTexto(
           from,
-          `Lo sentimos, el restaurante no abre el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
+          `Lo sentimos, el restaurante permanecerá cerrado el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
           `Por favor ingresá otra fecha.`
         );
         sesion.paso = "reserva_fecha";
       } else {
-        // Solo mediodía cerrado, noche abre
         await enviarMensajeTexto(
           from,
-          `Lo sentimos, el restaurante no abre al mediodía el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
+          `Lo sentimos, el restaurante permanecerá cerrado en turno mediodía el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
           `Podés reservar para la noche (20:00 - 23:30) o elegir otra fecha.`
         );
-        // No reseteamos paso — sigue en reserva_hora para que reintente
       }
       return;
     }
 
     if ((turno === "noche_1" || turno === "noche_2") && cierresDia.includes("noche")) {
       if (cierresDia.includes("maniana")) {
-        // Ambos cerrados
         await enviarMensajeTexto(
           from,
-          `Lo sentimos, el restaurante no abre el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
+          `Lo sentimos, el restaurante permanecerá cerrado el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
           `Por favor ingresá otra fecha.`
         );
         sesion.paso = "reserva_fecha";
       } else {
-        // Solo noche cerrada, mediodía abre
         await enviarMensajeTexto(
           from,
-          `Lo sentimos, el restaurante no abre a la noche el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
+          `Lo sentimos, el restaurante permanecerá cerrado en turno noche el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
           `Podés reservar para el mediodía (12:00 - 15:00) o en caso de querer turno noche, elegir otra fecha.`
         );
-        // No reseteamos paso — sigue en reserva_hora para que reintente
       }
       return;
     }
-    // ───────────────────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────────────────────
           
     sesion.datos.hora       = horaFormateada;
     sesion.datos.turno      = turno;
