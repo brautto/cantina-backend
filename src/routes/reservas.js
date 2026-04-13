@@ -232,7 +232,7 @@ router.post('/', async (req, res) => {
 // ── POST /manual ──────────────────────────────────────────────────────────────
 
 router.post('/manual', async (req, res) => {
-  const { nombre, telefono, fecha, hora, cantidad_personas, mesa_numero, turno} = req.body;
+  const { nombre, telefono, fecha, hora, cantidad_personas, mesa_numero, turno, ignorar_minimo } = req.body;
 
   if (!nombre || !telefono || !fecha || !hora || !cantidad_personas || !mesa_numero || !turno) {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
@@ -311,7 +311,7 @@ router.post('/manual', async (req, res) => {
     const mesaIdNum = mesa.id;
 
     // 2) Verificar compatibilidad de capacidad
-    if (cantidadNum < mesa.min_capacidad || cantidadNum > mesa.max_capacidad) {
+    if (cantidadNum > mesa.max_capacidad || (!ignorar_minimo && cantidadNum < mesa.min_capacidad)) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         error: `La mesa ${mesa.numero} no es compatible para ${cantidadNum} personas`
