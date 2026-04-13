@@ -13,14 +13,6 @@ const LINK_MAPS = "https://maps.app.goo.gl/jU6JN69EJ97mU34D6";
 
 const ALIAS_MP = "cintiaale03";
 
-// Links de Mercado Pago pre-generados por monto (cantidad_personas → link)
-const LINKS_SENIA = {
-  8:  "https://mpago.la/LINK_80000",  // reemplazar
-  9:  "https://mpago.la/LINK_90000",  // reemplazar
-  10: "https://mpago.la/LINK_100000", // reemplazar
-  11: "https://mpago.la/LINK_110000", // reemplazar
-  12: "https://mpago.la/LINK_120000", // reemplazar
-};
 
 function calcularTurno(horaStr) {
   const [h, m] = horaStr.split(":").map(Number);
@@ -586,17 +578,16 @@ async function manejarMensajeEntrante(message) {
     if (sesion.datos.cantidad_personas >= 8) {
       const monto       = sesion.datos.cantidad_personas * 10000;
       const montoFormat = monto.toLocaleString("es-AR");
-      const linkSenia   = LINKS_SENIA[sesion.datos.cantidad_personas] || LINKS_SENIA[12];
 
       sesion.paso = "reserva_esperando_senia";
 
       await enviarMensajeTexto(
         from,
         `Para reservas de 8 o más personas se requiere una *seña de $${montoFormat}*.\n\n` +
-        `Podés abonarla por:\n\n` +
-        `💙 *Mercado Pago:*\n${linkSenia}\n\n` +
-        `🏦 *Transferencia:*\nAlias: *${ALIAS_MP}*\nMonto: $${montoFormat}\n\n` +
-        `Una vez realizado el pago, *envianos el comprobante* como imagen y recepción lo verificará.\n` +
+        `Podés abonarla por transferencia bancaria:\n\n` +
+        `🏦 *Alias:* ${ALIAS_MP}\n` +
+        `💰 *Monto:* $${montoFormat}\n\n` +
+        `Una vez realizado el pago, *envianos el comprobante como imagen* y recepción lo verificará.\n` +
         `Tu reserva quedará confirmada una vez aprobada la seña. ✅`
       );
       return;
