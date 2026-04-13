@@ -159,6 +159,8 @@ async function manejarMensajeEntrante(message) {
 
   // Caso especial: imagen enviada mientras se espera comprobante de seña
   if (message.type === "image" && sesion.paso === "reserva_esperando_senia") {
+    if (sesion.datos.procesandoSenia) return; // ← evitar doble procesamiento
+    sesion.datos.procesandoSenia = true;
     await procesarReservaConSenia(from, sesion);
     return;
   }

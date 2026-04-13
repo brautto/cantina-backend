@@ -1,12 +1,15 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
-});
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    family: 4, // ← forzar IPv4
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASS,
+    },
+  });
 
 async function enviarNotificacionSenia({ nombre, fecha, cantidad_personas, monto, telefono }) {
   const fechaDisplay = fecha.split("T")[0].split("-").reverse().join("/");
