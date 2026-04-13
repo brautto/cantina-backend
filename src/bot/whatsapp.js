@@ -10,7 +10,7 @@ const CARTA_RESTAURANTE_URL = "https://drive.google.com/file/d/1KebJTGplqlkmPLVd
 const CARTA_DELIVERY_URL    = "https://drive.google.com/file/d/16SKQvvIxHg5O4go4YX1U1cr8EdEOG0Gb/view?usp=drive_link";
 const LINK_MAPS = "https://maps.app.goo.gl/jU6JN69EJ97mU34D6";
 const ALIAS_MP = "cintiaale03";
-const { enviarNotificacionSenia } = require('./mailer');
+const { enviarNotificacionSenia } = require('../services/mailer');
 
 function calcularTurno(horaStr) {
   const [h, m] = horaStr.split(":").map(Number);
