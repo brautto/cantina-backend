@@ -1,4 +1,4 @@
-const { pool } = require('../services/db');
+const { pool } = require('../db');
 const { enviarMensajeTexto } = require('../bot/whatsapp');
 
 async function enviarRecordatorios() {
