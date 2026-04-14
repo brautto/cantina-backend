@@ -9,6 +9,8 @@ const authRouter = require('./routes/auth');
 const diasCerradosRouter = require('./routes/diasCerrados');
 const app = express();
 const PORT = process.env.PORT || 3000;
+const cron = require('node-cron');
+const { enviarRecordatorios } = require('./jobs/recordatorioReservas');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -31,6 +33,11 @@ app.use('/reservas', reservasRouter);
 app.use('/', webhookRoutes);
 app.use('/auth', authRouter);
 
+// Cron: recordatorio automático cada hora en punto
+cron.schedule('0 * * * *', () => {
+  console.log('[CRON] Ejecutando recordatorios...');
+  enviarRecordatorios();
+});
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
