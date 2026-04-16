@@ -5,8 +5,8 @@ async function enviarRecordatorios() {
   const client = await pool.connect();
   try {
     const ahora = new Date();
-    const en3horas = new Date(ahora.getTime() + 0);
-    const en4horas = new Date(ahora.getTime() + 1 * 60 * 60 * 1000);
+    const en3horas = new Date(ahora.getTime() + 3 * 60 * 60 * 1000);
+    const en4horas = new Date(ahora.getTime() + 4 * 60 * 60 * 1000);
 
     // Convertir a hora Argentina (UTC-3)
     const offsetArgentina = -3 * 60;

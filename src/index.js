@@ -34,7 +34,7 @@ app.use('/', webhookRoutes);
 app.use('/auth', authRouter);
 
 // Cron: recordatorio automático cada hora en punto
-cron.schedule('* * * * *', () => {
+cron.schedule('0 * * * *', () => {
   console.log('[CRON] Ejecutando recordatorios...');
   enviarRecordatorios();
 });
