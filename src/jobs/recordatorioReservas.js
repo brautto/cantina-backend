@@ -8,9 +8,15 @@ async function enviarRecordatorios() {
     const en3horas = new Date(ahora.getTime() + 0);
     const en4horas = new Date(ahora.getTime() + 1 * 60 * 60 * 1000);
 
-    const horaDesde = `${String(en3horas.getHours()).padStart(2, '0')}:${String(en3horas.getMinutes()).padStart(2, '0')}:00`;
-    const horaHasta = `${String(en4horas.getHours()).padStart(2, '0')}:${String(en4horas.getMinutes()).padStart(2, '0')}:00`;
-    const fechaHoy = ahora.toISOString().split('T')[0];
+    // Convertir a hora Argentina (UTC-3)
+    const offsetArgentina = -3 * 60;
+    const ahoraArg = new Date(ahora.getTime() + offsetArgentina * 60 * 1000);
+    const en3horasArg = new Date(en3horas.getTime() + offsetArgentina * 60 * 1000);
+    const en4horasArg = new Date(en4horas.getTime() + offsetArgentina * 60 * 1000);
+
+    const horaDesde = `${String(en3horasArg.getUTCHours()).padStart(2, '0')}:${String(en3horasArg.getUTCMinutes()).padStart(2, '0')}:00`;
+    const horaHasta = `${String(en4horasArg.getUTCHours()).padStart(2, '0')}:${String(en4horasArg.getUTCMinutes()).padStart(2, '0')}:00`;
+    const fechaHoy = ahoraArg.toISOString().split('T')[0];
     console.log('[RECORDATORIO DEBUG] fechaHoy:', fechaHoy);
     console.log('[RECORDATORIO DEBUG] horaDesde:', horaDesde);
     console.log('[RECORDATORIO DEBUG] horaHasta:', horaHasta);
