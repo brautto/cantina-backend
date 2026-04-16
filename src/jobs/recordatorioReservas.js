@@ -44,9 +44,7 @@ async function enviarRecordatorios() {
           : String(reserva.fecha).split('T')[0].split('-').reverse().join('/');
 
         // Agregar 549 para enviar (el teléfono en BD está sin el 9)
-        const telefonoWA = reserva.telefono.startsWith('54')
-          ? '549' + reserva.telefono.slice(2)
-          : reserva.telefono;
+        const telefonoWA = reserva.telefono;
 
         await enviarMensajeTexto(
           telefonoWA,
