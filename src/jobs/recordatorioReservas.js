@@ -5,8 +5,8 @@ async function enviarRecordatorios() {
   const client = await pool.connect();
   try {
     const ahora = new Date();
-    const en3horas = new Date(ahora.getTime() + 3 * 60 * 60 * 1000);
-    const en4horas = new Date(ahora.getTime() + 4 * 60 * 60 * 1000);
+    const en3horas = new Date(ahora.getTime() + 0);
+    const en4horas = new Date(ahora.getTime() + 1 * 60 * 60 * 1000);
 
     const horaDesde = `${String(en3horas.getHours()).padStart(2, '0')}:${String(en3horas.getMinutes()).padStart(2, '0')}:00`;
     const horaHasta = `${String(en4horas.getHours()).padStart(2, '0')}:${String(en4horas.getMinutes()).padStart(2, '0')}:00`;
