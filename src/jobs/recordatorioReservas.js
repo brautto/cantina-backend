@@ -6,10 +6,10 @@ async function enviarRecordatorios() {
   try {
     const ahora = new Date();
     const en3horas = new Date(ahora.getTime() + 3 * 60 * 60 * 1000);
+    const en4horas = new Date(ahora.getTime() + 4 * 60 * 60 * 1000);
 
-    // Buscar reservas de hoy que empiecen en ~3 horas y no tengan recordatorio enviado
-    const horaDesde = `${String(en3horas.getHours()).padStart(2, '0')}:00:00`;
-    const horaHasta = `${String(en3horas.getHours()).padStart(2, '0')}:59:59`;
+    const horaDesde = `${String(en3horas.getHours()).padStart(2, '0')}:${String(en3horas.getMinutes()).padStart(2, '0')}:00`;
+    const horaHasta = `${String(en4horas.getHours()).padStart(2, '0')}:${String(en4horas.getMinutes()).padStart(2, '0')}:00`;
     const fechaHoy = ahora.toISOString().split('T')[0];
 
     const { rows: reservas } = await client.query(
@@ -18,7 +18,8 @@ async function enviarRecordatorios() {
        FROM reserva r
        JOIN persona p ON p.id = r.persona_id
        WHERE r.fecha = $1
-         AND r.hora BETWEEN $2 AND $3
+         AND r.hora >= $2
+         AND r.hora < $3
          AND r.estado IN ('pendiente', 'confirmada')
          AND r.recordatorio_enviado = false`,
       [fechaHoy, horaDesde, horaHasta]
