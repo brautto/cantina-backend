@@ -11,6 +11,9 @@ async function enviarRecordatorios() {
     const horaDesde = `${String(en3horas.getHours()).padStart(2, '0')}:${String(en3horas.getMinutes()).padStart(2, '0')}:00`;
     const horaHasta = `${String(en4horas.getHours()).padStart(2, '0')}:${String(en4horas.getMinutes()).padStart(2, '0')}:00`;
     const fechaHoy = ahora.toISOString().split('T')[0];
+    console.log('[RECORDATORIO DEBUG] fechaHoy:', fechaHoy);
+    console.log('[RECORDATORIO DEBUG] horaDesde:', horaDesde);
+    console.log('[RECORDATORIO DEBUG] horaHasta:', horaHasta);
 
     const { rows: reservas } = await client.query(
       `SELECT r.id, r.hora, r.turno, r.cantidad_personas, r.fecha,
