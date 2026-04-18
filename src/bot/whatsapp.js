@@ -69,11 +69,6 @@ async function enviarMensajePorChatwoot(conversationId, mensaje) {
 }
 
 async function enviarMensajeTexto(to, body, conversationId = null) {
-  if (conversationId) {
-    await enviarMensajePorChatwoot(conversationId, body);
-    return;
-  }
-  
   const toNormalizado = normalizarTelefono(to);
   const url = `https://graph.facebook.com/v23.0/${process.env.WHATSAPP_PHONE_ID}/messages`;
 
@@ -92,10 +87,10 @@ async function enviarMensajeTexto(to, body, conversationId = null) {
       },
     }
   );
-  // Si tenemos conversationId, también enviamos por Chatwoot para que aparezca en la interfaz
-  //if (conversationId) {
-  //  await enviarMensajePorChatwoot(conversationId, body);
-  //}
+
+  if (conversationId) {
+    await enviarMensajePorChatwoot(conversationId, body);
+  }
 }
 
 function obtenerOSesionCrear(telefono) {
