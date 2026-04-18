@@ -53,7 +53,8 @@ async function enviarMensajePorChatwoot(conversationId, mensaje) {
       {
         content: mensaje,
         message_type: 'outgoing',
-        private: false
+        private: false,
+        content_type: 'text'
       },
       {
         headers: {
@@ -63,7 +64,7 @@ async function enviarMensajePorChatwoot(conversationId, mensaje) {
       }
     );
   } catch (err) {
-    console.error('[CHATWOOT] Error al enviar mensaje:', err.message);
+    console.error('[CHATWOOT] Error al enviar mensaje:', err.response?.data || err.message);
   }
 }
 
@@ -92,9 +93,9 @@ async function enviarMensajeTexto(to, body, conversationId = null) {
     }
   );
   // Si tenemos conversationId, también enviamos por Chatwoot para que aparezca en la interfaz
-  if (conversationId) {
-    await enviarMensajePorChatwoot(conversationId, body);
-  }
+  //if (conversationId) {
+  //  await enviarMensajePorChatwoot(conversationId, body);
+  //}
 }
 
 function obtenerOSesionCrear(telefono) {
