@@ -46,7 +46,28 @@ function normalizarTelefono(from) {
   return from;
 }
 
-async function enviarMensajeTexto(to, body) {
+async function enviarMensajePorChatwoot(conversationId, mensaje) {
+  try {
+    await axios.post(
+      `${process.env.CHATWOOT_BASE_URL}/api/v1/accounts/${process.env.CHATWOOT_ACCOUNT_ID}/conversations/${conversationId}/messages`,
+      {
+        content: mensaje,
+        message_type: 'outgoing',
+        private: false
+      },
+      {
+        headers: {
+          'api_access_token': process.env.CHATWOOT_API_TOKEN,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  } catch (err) {
+    console.error('[CHATWOOT] Error al enviar mensaje:', err.message);
+  }
+}
+
+async function enviarMensajeTexto(to, body, conversationId = null) {
   const toNormalizado = normalizarTelefono(to);
   const url = `https://graph.facebook.com/v23.0/${process.env.WHATSAPP_PHONE_ID}/messages`;
 
@@ -65,6 +86,10 @@ async function enviarMensajeTexto(to, body) {
       },
     }
   );
+  // Si tenemos conversationId, también enviamos por Chatwoot para que aparezca en la interfaz
+  if (conversationId) {
+    await enviarMensajePorChatwoot(conversationId, body);
+  }
 }
 
 function obtenerOSesionCrear(telefono) {
@@ -157,11 +182,17 @@ async function manejarMensajeEntrante(message) {
 
   const sesion = obtenerOSesionCrear(from);
 
+  // Guardar conversationId de Chatwoot si viene en el mensaje
+  if (message.chatwoot_conversation_id) {
+    sesion.chatwootConversationId = message.chatwoot_conversation_id;
+  }
+  const cid = sesion.chatwootConversationId || null;
+
   // Caso especial: imagen enviada mientras se espera comprobante de seña
   if (message.type === "image" && sesion.paso === "reserva_esperando_senia") {
     if (sesion.datos.procesandoSenia) return; // ← evitar doble procesamiento
     sesion.datos.procesandoSenia = true;
-    await procesarReservaConSenia(from, sesion);
+    await procesarReservaConSenia(from, sesion,cid);
     return;
   }
 
@@ -172,7 +203,7 @@ async function manejarMensajeEntrante(message) {
   // ── Reinicio global (desde cualquier paso) ───────────────────────────────
   if (["menu", "hola", "buenas", "inicio", "0"].includes(texto)) {
     resetearSesion(sesion);
-    await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+    await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
     return;
   }
 
@@ -181,7 +212,7 @@ async function manejarMensajeEntrante(message) {
   const PASOS_TERMINALES = ["menu_delivery", "menu_pagos"];
   if (texto === "1" && PASOS_TERMINALES.includes(sesion.paso)) {
     resetearSesion(sesion);
-    await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+    await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
     return;
   }
 
@@ -190,23 +221,23 @@ async function manejarMensajeEntrante(message) {
     switch (texto) {
       case "1":
         sesion.paso = "menu_reservas";
-        await enviarMensajeTexto(from, MSG_MENU_RESERVAS);
+        await enviarMensajeTexto(from, MSG_MENU_RESERVAS, cid);
         return;
       case "2":
         sesion.paso = "menu_delivery";
-        await enviarMensajeTexto(from, MSG_MENU_DELIVERY);
+        await enviarMensajeTexto(from, MSG_MENU_DELIVERY, cid);
         return;
       case "3":
         sesion.paso = "menu_carta";
-        await enviarMensajeTexto(from, MSG_MENU_CARTA);
+        await enviarMensajeTexto(from, MSG_MENU_CARTA, cid);
         return;
       case "4":
         sesion.paso = "menu_pagos";
-        await enviarMensajeTexto(from, MSG_MENU_PAGOS);
+        await enviarMensajeTexto(from, MSG_MENU_PAGOS, cid);
         return;
       case "5":
         sesion.paso = "menu_faq";
-        await enviarMensajeTexto(from, MSG_MENU_FAQ);
+        await enviarMensajeTexto(from, MSG_MENU_FAQ, cid);
         return;
       default:
         // Si el mensaje parece una despedida o agradecimiento, no respondemos nada
@@ -215,7 +246,7 @@ async function manejarMensajeEntrante(message) {
           "perfecto", "joya", "excelente", "re bien", "copado", "graciass", "👍", "🙏", "😊", "❤️"];
         const esSilencio = PALABRAS_SILENCIO.some(p => texto.includes(p));
         if (!esSilencio) {
-          await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+          await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
         }
         return;
     }
@@ -225,9 +256,9 @@ async function manejarMensajeEntrante(message) {
   if (sesion.paso === "menu_delivery") {
     if (texto === "1") {
       resetearSesion(sesion);
-      await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+      await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
     } else {
-      await enviarMensajeTexto(from, MSG_MENU_DELIVERY);
+      await enviarMensajeTexto(from, MSG_MENU_DELIVERY, cid);
     }
     return;
   }
@@ -236,9 +267,9 @@ async function manejarMensajeEntrante(message) {
   if (sesion.paso === "menu_pagos") {
     if (texto === "1") {
       resetearSesion(sesion);
-      await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+      await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
     } else {
-      await enviarMensajeTexto(from, MSG_MENU_PAGOS);
+      await enviarMensajeTexto(from, MSG_MENU_PAGOS, cid);
     }
     return;
   }
@@ -249,14 +280,14 @@ async function manejarMensajeEntrante(message) {
       case "1":
         sesion.paso = "reserva_nombre";
         sesion.datos = {};
-        await enviarMensajeTexto(from, "Perfecto. ¿Cuál es tu nombre y apellido?");
+        await enviarMensajeTexto(from, "Perfecto. ¿Cuál es tu nombre y apellido?", cid);
         return;
       case "2":
         sesion.paso = "cancelar_fecha";
         sesion.datos = {};
         await enviarMensajeTexto(
           from,
-          "¿Para qué fecha querés cancelar la reserva?\n\nEscribila en formato *DD/MM/AAAA*\nEjemplo: *20/03/2026*"
+          "¿Para qué fecha querés cancelar la reserva?\n\nEscribila en formato *DD/MM/AAAA*\nEjemplo: *20/03/2026*", cid
         );
         return;
       case "3":
@@ -264,15 +295,15 @@ async function manejarMensajeEntrante(message) {
         sesion.datos = {};
         await enviarMensajeTexto(
           from,
-          "¿Para qué fecha querés modificar la reserva?\n\nEscribila en formato *DD/MM/AAAA*\nEjemplo: *20/03/2026*"
+          "¿Para qué fecha querés modificar la reserva?\n\nEscribila en formato *DD/MM/AAAA*\nEjemplo: *20/03/2026*", cid
         );
         return;
       case "4":
         resetearSesion(sesion);
-        await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+        await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
         return;
       default:
-        await enviarMensajeTexto(from, `Opción inválida.\n\n${MSG_MENU_RESERVAS}`);
+        await enviarMensajeTexto(from, `Opción inválida.\n\n${MSG_MENU_RESERVAS}`, cid);
         return;
     }
   }
@@ -287,21 +318,21 @@ async function manejarMensajeEntrante(message) {
       case "1":
         await enviarMensajeTexto(
           from,
-          `Aquí está nuestra carta del restaurante 🍽️\n\n${CARTA_RESTAURANTE_URL}` + NAV_CARTA
+          `Aquí está nuestra carta del restaurante 🍽️\n\n${CARTA_RESTAURANTE_URL}` + NAV_CARTA, cid
         );
         return;
       case "2":
         await enviarMensajeTexto(
           from,
-          `Aquí está nuestra carta de delivery 🚚\n\n${CARTA_DELIVERY_URL}` + NAV_CARTA
+          `Aquí está nuestra carta de delivery 🚚\n\n${CARTA_DELIVERY_URL}` + NAV_CARTA, cid
         );
         return;
       case "3":
         resetearSesion(sesion);
-        await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+        await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
         return;
       default:
-        await enviarMensajeTexto(from, `Opción inválida.\n\n${MSG_MENU_CARTA}`);
+        await enviarMensajeTexto(from, `Opción inválida.\n\n${MSG_MENU_CARTA}`, cid);
         return;
     }
   }
@@ -314,14 +345,14 @@ async function manejarMensajeEntrante(message) {
           from,
           `📍 *Ubicación*\n\nAv. 58 3202, Necochea, Buenos Aires.\n\n` +
           `Google Maps: ${LINK_MAPS}` +
-          NAV_FAQ
+          NAV_FAQ, cid
         );
         return;
       case "2":
         await enviarMensajeTexto(
           from,
           `🍴 *Tipo de cocina*\n\nEspecialidad en pescados y mariscos, con opciones de pastas y carnes.` +
-          NAV_FAQ
+          NAV_FAQ, cid
         );
         return;
       case "3":
@@ -332,7 +363,7 @@ async function manejarMensajeEntrante(message) {
           `• Primer turno nocturno: 20:00 a 22:00\n` +
           `• Segundo turno nocturno: 22:00 a 23:30\n\n` +
           `Si se le permite realizar la reserva es porque hay disponibilidad!` +
-          NAV_FAQ
+          NAV_FAQ, cid
         );
         return;
       case "4":
@@ -341,29 +372,29 @@ async function manejarMensajeEntrante(message) {
           `🥗 *Opciones alimentarias*\n\n` +
           `Contamos con opciones:\n• Vegetarianas 🥬\n• Veganas 🌱\n• Sin gluten 🚫+🌾\n\n` +
           `Consultanos al momento de reservar si tenés algún requerimiento especial.` +
-          NAV_FAQ
+          NAV_FAQ, cid
         );
         return;
       case "5":
         await enviarMensajeTexto(
           from,
           `👶 *Menú infantil*\n\nOfrecemos menú especial para niños:\n• Pastas 🍝\n• Milanesas de carne 🫓\n• Carne vacuna 🥩` +
-          NAV_FAQ
+          NAV_FAQ, cid
         );
         return;
       case "6":
         await enviarMensajeTexto(
           from,
           `🐾 *Mascotas*\n\nLamentablemente no se aceptan mascotas en el local.` +
-          NAV_FAQ
+          NAV_FAQ, cid
         );
         return;
       case "7":
         resetearSesion(sesion);
-        await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+        await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
         return;
       default:
-        await enviarMensajeTexto(from, `Opción inválida.\n\n${MSG_MENU_FAQ}`);
+        await enviarMensajeTexto(from, `Opción inválida.\n\n${MSG_MENU_FAQ}`, cid);
         return;
     }
   }
@@ -374,14 +405,14 @@ async function manejarMensajeEntrante(message) {
 
   if (sesion.paso === "reserva_nombre") {
     if (textoOriginal.length < 3) {
-      await enviarMensajeTexto(from, "Por favor ingresá tu nombre y apellido completo.");
+      await enviarMensajeTexto(from, "Por favor ingresá tu nombre y apellido completo.", cid);
       return;
     }
     sesion.datos.nombre = textoOriginal;
     sesion.paso = "reserva_fecha";
     await enviarMensajeTexto(
       from,
-      "¿Para qué fecha querés la reserva?\n\nEscribila en formato *DD/MM/AAAA*\nEjemplo: *20/03/2026*"
+      "¿Para qué fecha querés la reserva?\n\nEscribila en formato *DD/MM/AAAA*\nEjemplo: *20/03/2026*", cid
     );
     return;
   }
@@ -391,7 +422,7 @@ async function manejarMensajeEntrante(message) {
     const match = textoOriginal.match(regexFecha);
 
     if (!match) {
-      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *20/03/2026*");
+      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *20/03/2026*", cid);
       return;
     }
 
@@ -400,7 +431,7 @@ async function manejarMensajeEntrante(message) {
     const fechaObj = new Date(`${fechaISO}T12:00:00`);
 
     if (isNaN(fechaObj.getTime())) {
-      await enviarMensajeTexto(from, "La fecha ingresada no es válida. Intentá de nuevo: *DD/MM/AAAA*");
+      await enviarMensajeTexto(from, "La fecha ingresada no es válida. Intentá de nuevo: *DD/MM/AAAA*", cid);
       return;
     }
 
@@ -408,7 +439,7 @@ async function manejarMensajeEntrante(message) {
     hoy.setHours(0, 0, 0, 0);
 
     if (fechaObj < hoy) {
-      await enviarMensajeTexto(from, "La fecha ingresada ya pasó. Escribí una fecha futura.");
+      await enviarMensajeTexto(from, "La fecha ingresada ya pasó. Escribí una fecha futura.", cid);
       return;
     }
 
@@ -424,7 +455,7 @@ async function manejarMensajeEntrante(message) {
         await enviarMensajeTexto(
           from,
           `Lo sentimos, el restaurante permanecerá cerrado el *${textoOriginal}* 😔.\n\n` +
-          `Por favor elegí otra fecha.`
+          `Por favor elegí otra fecha.`, cid
         );
         return;
       }
@@ -446,7 +477,7 @@ async function manejarMensajeEntrante(message) {
       `Escribila en formato *HH:MM*. Ejemplo: *21:00*\n\n` +
       `Nuestros horarios:\n` +
       `• Mediodía: 12:00 a 15:00\n` +
-      `• Noche: 20:00 a 23:30`
+      `• Noche: 20:00 a 23:30`, cid
     );
     return;
   }
@@ -456,7 +487,7 @@ async function manejarMensajeEntrante(message) {
     const match = textoOriginal.match(regexHora);
 
     if (!match) {
-      await enviarMensajeTexto(from, "Formato inválido. Escribí la hora así: *21:00*");
+      await enviarMensajeTexto(from, "Formato inválido. Escribí la hora así: *21:00*", cid);
       return;
     }
 
@@ -465,7 +496,7 @@ async function manejarMensajeEntrante(message) {
     const m = parseInt(mStr, 10);
 
     if (h > 23 || m > 59) {
-      await enviarMensajeTexto(from, "Hora inválida. Ejemplo válido: *21:00*");
+      await enviarMensajeTexto(from, "Hora inválida. Ejemplo válido: *21:00*", cid);
       return;
     }
 
@@ -481,14 +512,14 @@ async function manejarMensajeEntrante(message) {
         await enviarMensajeTexto(
           from,
           `Lo sentimos, el restaurante permanecerá cerrado el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
-          `Por favor ingresá otra fecha.`
+          `Por favor ingresá otra fecha.`, cid
         );
         sesion.paso = "reserva_fecha";
       } else {
         await enviarMensajeTexto(
           from,
           `Lo sentimos, el restaurante permanecerá cerrado en turno mediodía el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
-          `Podés reservar para la noche (20:00 - 23:30) o elegir otra fecha.`
+          `Podés reservar para la noche (20:00 - 23:30) o elegir otra fecha.`, cid
         );
       }
       return;
@@ -499,14 +530,14 @@ async function manejarMensajeEntrante(message) {
         await enviarMensajeTexto(
           from,
           `Lo sentimos, el restaurante permanecerá cerrado el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
-          `Por favor ingresá otra fecha.`
+          `Por favor ingresá otra fecha.`, cid
         );
         sesion.paso = "reserva_fecha";
       } else {
         await enviarMensajeTexto(
           from,
           `Lo sentimos, el restaurante permanecerá cerrado en turno noche el *${formatearFecha(sesion.datos.fecha)}* 😔.\n\n` +
-          `Podés reservar para el mediodía (12:00 - 15:00) o en caso de querer turno noche, elegir otra fecha.`
+          `Podés reservar para el mediodía (12:00 - 15:00) o en caso de querer turno noche, elegir otra fecha.`, cid
         );
       }
       return;
@@ -518,7 +549,7 @@ async function manejarMensajeEntrante(message) {
     sesion.datos.turnoLabel = turnoLabel;
     sesion.paso             = "reserva_personas";
 
-    await enviarMensajeTexto(from, "¿Para cuántas personas sería la reserva? Tenemos mesas disponibles para grupos de 1 a 12 personas.");
+    await enviarMensajeTexto(from, "¿Para cuántas personas sería la reserva? Tenemos mesas disponibles para grupos de 1 a 12 personas.", cid);
     return;
   }
 
@@ -526,7 +557,7 @@ async function manejarMensajeEntrante(message) {
     const cantidad = parseInt(texto, 10);
 
     if (isNaN(cantidad) || cantidad <= 0) {
-      await enviarMensajeTexto(from, "Indicame un número válido de personas.");
+      await enviarMensajeTexto(from, "Indicame un número válido de personas.", cid);
       return;
     }
 
@@ -535,7 +566,7 @@ async function manejarMensajeEntrante(message) {
         from,
         `Para grupos de más de 12 personas, la reserva se coordina directamente por llamada telefónica. 📞\n\n` +
         `Comunicate con nosotros al:\n*+54 9 2262 518504*\n\n` +
-        `¡Estaremos encantados de atenderte!`
+        `¡Estaremos encantados de atenderte!`, cid
       );
       resetearSesion(sesion);
       return;
@@ -554,7 +585,7 @@ async function manejarMensajeEntrante(message) {
       `📅 Fecha: ${fechaDisplay}\n` +
       `🕐 Turno: ${sesion.datos.turnoLabel}\n` +
       `👥 Personas: ${sesion.datos.cantidad_personas}\n\n` +
-      `Respondé:\n*1.* Confirmar ✅\n*2.* Cancelar ❌`
+      `Respondé:\n*1.* Confirmar ✅\n*2.* Cancelar ❌`, cid
     );
     return;
   }
@@ -564,13 +595,13 @@ async function manejarMensajeEntrante(message) {
       resetearSesion(sesion);
       await enviarMensajeTexto(
         from,
-        "Reserva cancelada. Escribí *1* para volver al menú principal cuando quieras."
+        "Reserva cancelada. Escribí *1* para volver al menú principal cuando quieras.", cid
       );
       return;
     }
 
     if (texto !== "1") {
-      await enviarMensajeTexto(from, "Respondé *1* para confirmar o *2* para cancelar.");
+      await enviarMensajeTexto(from, "Respondé *1* para confirmar o *2* para cancelar.", cid);
       return;
     }
 
@@ -588,27 +619,27 @@ async function manejarMensajeEntrante(message) {
         `🏦 *Alias:* ${ALIAS_MP}\n` +
         `💰 *Monto:* $${montoFormat}\n\n` +
         `Una vez realizado el pago, *envianos el comprobante como imagen* y recepción lo verificará.\n` +
-        `Tu reserva quedará confirmada una vez aprobada la seña. ✅`
+        `Tu reserva quedará confirmada una vez aprobada la seña. ✅`, cid
       );
       return;
     }
 
     // ── Reserva sin seña: conectar al backend ────────────────────────────────
-    await procesarReservaEnBackend(from, sesion);
+    await procesarReservaEnBackend(from, sesion,cid);
     return;
   }
 
   // ── Esperar comprobante de seña ──────────────────────────────────────────
   if (sesion.paso === "reserva_esperando_senia") {
     if (message.type === "image") {
-      await procesarReservaConSenia(from, sesion);
+      await procesarReservaConSenia(from, sesion,cid);
       return;
     }
 
     await enviarMensajeTexto(
       from,
       "Por favor envianos el *comprobante de pago como imagen* 📷\n\n" +
-      "Una vez que recepción lo verifique, te confirmamos la reserva."
+      "Una vez que recepción lo verifique, te confirmamos la reserva.", cid
     );
     return;
   }
@@ -622,7 +653,7 @@ async function manejarMensajeEntrante(message) {
     const match = textoOriginal.match(regexFecha);
 
     if (!match) {
-      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *20/03/2026*");
+      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *20/03/2026*", cid);
       return;
     }
 
@@ -644,7 +675,7 @@ async function manejarMensajeEntrante(message) {
       });
 
       if (reservas.length === 0) {
-        await enviarMensajeTexto(from, `No encontré reservas activas para el *${textoOriginal}*.\n\nEscribí *1* para volver al menú principal.`);
+        await enviarMensajeTexto(from, `No encontré reservas activas para el *${textoOriginal}*.\n\nEscribí *1* para volver al menú principal.`, cid);
         resetearSesion(sesion);
         return;
       }
@@ -662,7 +693,7 @@ async function manejarMensajeEntrante(message) {
           `📅 Fecha: ${formatearFecha(r.fecha)}\n` +
           `🕐 Horario: ${calcularTurnoLabel(r.turno)}\n` +
           `👥 Personas: ${r.cantidad_personas}\n\n` +
-          `*1.* Sí, cancelar ❌\n*2.* No, volver`
+          `*1.* Sí, cancelar ❌\n*2.* No, volver`, cid
         );
         return;
       }
@@ -673,10 +704,10 @@ async function manejarMensajeEntrante(message) {
       });
       msg += `\n¿Cuál querés cancelar? Respondé con el número.`;
       if (reservas.length > 1) msg += `\nO escribí *0* para no cancelar ninguna.`;
-      await enviarMensajeTexto(from, msg);
+      await enviarMensajeTexto(from, msg, cid);
     } catch (err) {
       console.error("[BOT cancelar_fecha]", err.message);
-      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.");
+      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.", cid);
       resetearSesion(sesion);
     }
     return;
@@ -697,7 +728,7 @@ async function manejarMensajeEntrante(message) {
         await enviarMensajeTexto(
           from,
           "No encontré reservas activas para tu número de hoy en adelante.\n\n" +
-          "Escribí *1* para volver al menú principal."
+          "Escribí *1* para volver al menú principal.", cid
         );
         resetearSesion(sesion);
         return;
@@ -716,10 +747,10 @@ async function manejarMensajeEntrante(message) {
       msg += `\n¿Cuál querés cancelar? Respondé con el número.`;
       if (reservas.length > 1) msg += `\nO escribí *0* para no cancelar ninguna.`;
 
-      await enviarMensajeTexto(from, msg);
+      await enviarMensajeTexto(from, msg, cid);
     } catch (err) {
       console.error("[BOT cancelar_buscar]", err.message);
-      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.");
+      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.", cid);
       resetearSesion(sesion);
     }
     return;
@@ -728,7 +759,7 @@ async function manejarMensajeEntrante(message) {
   if (sesion.paso === "cancelar_elegir") {
     if (texto === "0") {
       resetearSesion(sesion);
-      await enviarMensajeTexto(from, "De acuerdo. Escribí *1* para volver al menú principal.");
+      await enviarMensajeTexto(from, "De acuerdo. Escribí *1* para volver al menú principal.", cid);
       return;
     }
 
@@ -736,7 +767,7 @@ async function manejarMensajeEntrante(message) {
     const reservas = sesion.datos.reservasEncontradas || [];
 
     if (isNaN(idx) || idx < 0 || idx >= reservas.length) {
-      await enviarMensajeTexto(from, `Opción inválida. Respondé con un número del 1 al ${reservas.length}.`);
+      await enviarMensajeTexto(from, `Opción inválida. Respondé con un número del 1 al ${reservas.length}.`, cid);
       return;
     }
 
@@ -752,7 +783,7 @@ async function manejarMensajeEntrante(message) {
       `📅 Fecha: ${fechaDisplay}\n` +
       `🕐 Horario: ${calcularTurnoLabel(reservaAcancelar.turno)}\n` +
       `👥 Personas: ${reservaAcancelar.cantidad_personas}\n\n` +
-      `*1.* Sí, cancelar ❌\n*2.* No, volver`
+      `*1.* Sí, cancelar ❌\n*2.* No, volver`, cid
     );
     return;
   }
@@ -760,12 +791,12 @@ async function manejarMensajeEntrante(message) {
   if (sesion.paso === "cancelar_confirmar") {
     if (texto === "2") {
       resetearSesion(sesion);
-      await enviarMensajeTexto(from, `De acuerdo, no se canceló nada.\n\n${MSG_MENU_PRINCIPAL}`);
+      await enviarMensajeTexto(from, `De acuerdo, no se canceló nada.\n\n${MSG_MENU_PRINCIPAL}`, cid);
       return;
     }
 
     if (texto !== "1") {
-      await enviarMensajeTexto(from, "Respondé *1* para confirmar la cancelación o *2* para volver.");
+      await enviarMensajeTexto(from, "Respondé *1* para confirmar la cancelación o *2* para volver.", cid);
       return;
     }
 
@@ -780,13 +811,13 @@ async function manejarMensajeEntrante(message) {
       await enviarMensajeTexto(
         from,
         `✅ Tu reserva del *${fechaDisplay}* (${reserva.turno}) fue cancelada correctamente.\n\n` +
-        `Esperamos verte pronto. Escribí *1* para volver al menú principal.`
+        `Esperamos verte pronto. Escribí *1* para volver al menú principal.`, cid
       );
     } catch (err) {
       console.error("[BOT cancelar_confirmar]", err.message);
       await enviarMensajeTexto(
         from,
-        "Hubo un problema al cancelar la reserva. Por favor comunicate directamente con el restaurante."
+        "Hubo un problema al cancelar la reserva. Por favor comunicate directamente con el restaurante.", cid
       );
       resetearSesion(sesion);
     }
@@ -802,7 +833,7 @@ async function manejarMensajeEntrante(message) {
     const match = textoOriginal.match(regexFecha);
 
     if (!match) {
-      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *20/03/2026*");
+      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *20/03/2026*", cid);
       return;
     }
 
@@ -823,7 +854,7 @@ async function manejarMensajeEntrante(message) {
       });
 
       if (reservas.length === 0) {
-        await enviarMensajeTexto(from, `No encontré reservas activas para el *${textoOriginal}*.\n\nEscribí *1* para volver al menú principal.`);
+        await enviarMensajeTexto(from, `No encontré reservas activas para el *${textoOriginal}*.\n\nEscribí *1* para volver al menú principal.`, cid);
         resetearSesion(sesion);
         return;
       }
@@ -843,7 +874,7 @@ async function manejarMensajeEntrante(message) {
           `¿Qué querés modificar?\n\n` +
           `*1.* Fecha 📅\n` +
           `*2.* Horario 🕐\n` +
-          `*3.* Cantidad de personas 👥`
+          `*3.* Cantidad de personas 👥`, cid
         );
         return;
       }
@@ -854,10 +885,10 @@ async function manejarMensajeEntrante(message) {
         msg += `*${i + 1}.* 📅 ${formatearFecha(r.fecha)} | 🕐 ${calcularTurnoLabel(r.turno)} | 👥 ${r.cantidad_personas} personas\n`;
       });
       msg += `\n¿Cuál querés modificar? Respondé con el número.`;
-      await enviarMensajeTexto(from, msg);
+      await enviarMensajeTexto(from, msg, cid);
     } catch (err) {
       console.error("[BOT modificar_fecha]", err.message);
-      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.");
+      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.", cid);
       resetearSesion(sesion);
     }
     return;
@@ -877,7 +908,7 @@ async function manejarMensajeEntrante(message) {
       if (reservas.length === 0) {
         await enviarMensajeTexto(
           from,
-          "No encontré reservas activas para tu número.\n\nEscribí *1* para volver al menú principal."
+          "No encontré reservas activas para tu número.\n\nEscribí *1* para volver al menú principal.", cid
         );
         resetearSesion(sesion);
         return;
@@ -899,7 +930,7 @@ async function manejarMensajeEntrante(message) {
           `¿Qué querés modificar?\n\n` +
           `*1.* Fecha 📅\n` +
           `*2.* Horario 🕐\n` +
-          `*3.* Cantidad de personas 👥`
+          `*3.* Cantidad de personas 👥`, cid
         );
         return;
       }
@@ -914,10 +945,10 @@ async function manejarMensajeEntrante(message) {
       });
 
       msg += `\n¿Cuál querés modificar? Respondé con el número.`;
-      await enviarMensajeTexto(from, msg);
+      await enviarMensajeTexto(from, msg, cid);
     } catch (err) {
       console.error("[BOT modificar_buscar]", err.message);
-      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.");
+      await enviarMensajeTexto(from, "Hubo un problema al buscar tus reservas. Intentá de nuevo más tarde.", cid);
       resetearSesion(sesion);
     }
     return;
@@ -928,7 +959,7 @@ async function manejarMensajeEntrante(message) {
     const reservas = sesion.datos.reservasEncontradas || [];
 
     if (isNaN(idx) || idx < 0 || idx >= reservas.length) {
-      await enviarMensajeTexto(from, `Opción inválida. Respondé con un número del 1 al ${reservas.length}.`);
+      await enviarMensajeTexto(from, `Opción inválida. Respondé con un número del 1 al ${reservas.length}.`, cid);
       return;
     }
 
@@ -940,7 +971,7 @@ async function manejarMensajeEntrante(message) {
       `¿Qué querés modificar?\n\n` +
       `*1.* Fecha 📅\n` +
       `*2.* Horario 🕐\n` +
-      `*3.* Cantidad de personas 👥`
+      `*3.* Cantidad de personas 👥`, cid
     );
     return;
   }
@@ -951,7 +982,7 @@ async function manejarMensajeEntrante(message) {
         sesion.paso = "modificar_nueva_fecha";
         await enviarMensajeTexto(
           from,
-          "¿Cuál es la nueva fecha?\n\nFormato: *DD/MM/AAAA*\nEjemplo: *25/03/2026*"
+          "¿Cuál es la nueva fecha?\n\nFormato: *DD/MM/AAAA*\nEjemplo: *25/03/2026*", cid
         );
         return;
       case "2":
@@ -959,15 +990,15 @@ async function manejarMensajeEntrante(message) {
         await enviarMensajeTexto(
           from,
           `¿A qué hora querés cambiar? ⏰\n\nFormato *HH:MM*. Ejemplo: *21:00*\n\n` +
-          `Nuestros horarios:\n• Mediodía: 12:00 a 15:00\n• Noche: 20:00 a 23:30`
+          `Nuestros horarios:\n• Mediodía: 12:00 a 15:00\n• Noche: 20:00 a 23:30`, cid
         );
         return;
       case "3":
         sesion.paso = "modificar_nueva_cantidad";
-        await enviarMensajeTexto(from, "¿Cuántas personas van a ser?");
+        await enviarMensajeTexto(from, "¿Cuántas personas van a ser?", cid);
         return;
       default:
-        await enviarMensajeTexto(from, "Respondé *1*, *2* o *3*.");
+        await enviarMensajeTexto(from, "Respondé *1*, *2* o *3*.", cid);
         return;
     }
   }
@@ -977,7 +1008,7 @@ async function manejarMensajeEntrante(message) {
     const match = textoOriginal.match(regexFecha);
 
     if (!match) {
-      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *25/03/2026*");
+      await enviarMensajeTexto(from, "Formato inválido. Escribí la fecha así: *25/03/2026*", cid);
       return;
     }
 
@@ -986,7 +1017,7 @@ async function manejarMensajeEntrante(message) {
     const fechaObj = new Date(`${fechaISO}T12:00:00`);
 
     if (isNaN(fechaObj.getTime())) {
-      await enviarMensajeTexto(from, "La fecha no es válida. Intentá de nuevo.");
+      await enviarMensajeTexto(from, "La fecha no es válida. Intentá de nuevo.", cid);
       return;
     }
 
@@ -994,13 +1025,13 @@ async function manejarMensajeEntrante(message) {
     hoy.setHours(0, 0, 0, 0);
 
     if (fechaObj < hoy) {
-      await enviarMensajeTexto(from, "La fecha ya pasó. Ingresá una fecha futura.");
+      await enviarMensajeTexto(from, "La fecha ya pasó. Ingresá una fecha futura.", cid);
       return;
     }
 
     sesion.datos.nuevaFecha = fechaISO;
     sesion.paso = "modificar_confirmar";
-    await confirmarModificacion(from, sesion);
+    await confirmarModificacion(from, sesion,cid);
     return;
   }
 
@@ -1009,7 +1040,7 @@ async function manejarMensajeEntrante(message) {
     const match = textoOriginal.match(regexHora);
 
     if (!match) {
-      await enviarMensajeTexto(from, "Formato inválido. Escribí la hora así: *21:00*");
+      await enviarMensajeTexto(from, "Formato inválido. Escribí la hora así: *21:00*", cid);
       return;
     }
 
@@ -1018,7 +1049,7 @@ async function manejarMensajeEntrante(message) {
     const m = parseInt(mStr, 10);
 
     if (h > 23 || m > 59) {
-      await enviarMensajeTexto(from, "Hora inválida. Ejemplo válido: *21:00*");
+      await enviarMensajeTexto(from, "Hora inválida. Ejemplo válido: *21:00*", cid);
       return;
     }
 
@@ -1029,7 +1060,7 @@ async function manejarMensajeEntrante(message) {
     sesion.datos.nuevoTurnoLabel = calcularTurnoLabel(turno);
     sesion.datos.nuevaHora       = horaFormateada;
     sesion.paso = "modificar_confirmar";
-    await confirmarModificacion(from, sesion);
+    await confirmarModificacion(from, sesion,cid);
     return;
   }
 
@@ -1037,40 +1068,40 @@ async function manejarMensajeEntrante(message) {
     const cantidad = parseInt(texto, 10);
 
     if (isNaN(cantidad) || cantidad <= 0) {
-      await enviarMensajeTexto(from, "Indicame un número válido de personas.");
+      await enviarMensajeTexto(from, "Indicame un número válido de personas.", cid);
       return;
     }
 
     sesion.datos.nuevaCantidad = cantidad;
     sesion.paso = "modificar_confirmar";
-    await confirmarModificacion(from, sesion);
+    await confirmarModificacion(from, sesion,cid);
     return;
   }
 
   if (sesion.paso === "modificar_confirmar") {
     if (texto === "2") {
       resetearSesion(sesion);
-      await enviarMensajeTexto(from, "Modificación cancelada.\n\nSi querés seguir navegando, escribí *1* para volver al menú de reservas.");
+      await enviarMensajeTexto(from, "Modificación cancelada.\n\nSi querés seguir navegando, escribí *1* para volver al menú de reservas.", cid);
       return;
     }
 
     if (texto !== "1") {
-      await enviarMensajeTexto(from, "Respondé *1* para confirmar o *2* para cancelar.");
+      await enviarMensajeTexto(from, "Respondé *1* para confirmar o *2* para cancelar.", cid);
       return;
     }
 
-    await ejecutarModificacion(from, sesion);
+    await ejecutarModificacion(from, sesion,cid);
     return;
   }
 
   // ── Fallback ─────────────────────────────────────────────────────────────
   resetearSesion(sesion);
-  await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL);
+  await enviarMensajeTexto(from, MSG_MENU_PRINCIPAL, cid);
 }
 
 // ─── Funciones auxiliares de reserva ─────────────────────────────────────────
 
-async function procesarReservaEnBackend(from, sesion) {
+async function procesarReservaEnBackend(from, sesion, cid) {
   const { nombre, fecha, hora, cantidad_personas, turnoLabel } = sesion.datos;
   const telefonoNorm = from.replace(/\D/g, "");
 
@@ -1095,7 +1126,7 @@ async function procesarReservaEnBackend(from, sesion) {
       `⏰ *Recordá que tenemos una tolerancia de 15-20 minutos.* Pasado ese tiempo, la mesa puede quedar sujeta a disponibilidad.\n\n` +
       `¡Esperamos verte pronto! 🍽️\n\n` +
       `───────────────\n` +
-      `Si necesitás algo más escribí *1*, o podés cerrar el chat tranquilo. 😊`
+      `Si necesitás algo más escribí *1*, o podés cerrar el chat tranquilo. 😊`, cid
     );
   } catch (err) {
     const status = err.response?.status;
@@ -1107,24 +1138,24 @@ async function procesarReservaEnBackend(from, sesion) {
       await enviarMensajeTexto(
         from,
         "Lo sentimos, no hay disponibilidad para ese turno y fecha. 😔\n\n" +
-        "¿Querés intentar con otro turno o fecha? Escribí *1* para volver al menú principal."
+        "¿Querés intentar con otro turno o fecha? Escribí *1* para volver al menú principal.", cid
       );
     } else if (status === 400 && msg.includes("Límite")) {
       await enviarMensajeTexto(
         from,
         "Ya tenés el máximo de reservas permitidas para ese día.\n\n" +
-        "Escribí *1* para volver al menú principal."
+        "Escribí *1* para volver al menú principal.", cid
       );
     } else if (status === 400 && msg.includes("no abre ese día")) {
         await enviarMensajeTexto(
           from,
           "Lo sentimos, el restaurante no está abierto para ese día o turno. 😔\n\n" +
-          "Por favor elija otra fecha o turno. Escribí *1* para volver al menú principal."
+          "Por favor elija otra fecha o turno. Escribí *1* para volver al menú principal.", cid
         );
     } else {
       await enviarMensajeTexto(
         from,
-        "Hubo un problema al registrar tu reserva. Por favor intentá de nuevo más tarde o comunicate con el restaurante."
+        "Hubo un problema al registrar tu reserva. Por favor intentá de nuevo más tarde o comunicate con el restaurante.", cid
       );
     }
 
@@ -1132,7 +1163,7 @@ async function procesarReservaEnBackend(from, sesion) {
   }
 }
 
-async function procesarReservaConSenia(from, sesion) {
+async function procesarReservaConSenia(from, sesion, cid = null) {
   const { nombre, fecha, hora, cantidad_personas } = sesion.datos;
   const telefonoNorm = from.replace(/\D/g, "");
 
@@ -1166,7 +1197,7 @@ async function procesarReservaConSenia(from, sesion) {
       from,
       `📨 *Comprobante recibido. ¡Gracias!*\n\n` +
       `Tu reserva para el *${fechaDisplay}* (${cantidad_personas} personas) está *pendiente de verificación*.\n\n` +
-      `Recepción revisará el pago y te confirmamos a la brevedad. ✅`
+      `Recepción revisará el pago y te confirmamos a la brevedad. ✅`, cid
     );
   } catch (err) {
     const status = err.response?.status;
@@ -1178,18 +1209,18 @@ async function procesarReservaConSenia(from, sesion) {
       await enviarMensajeTexto(
         from,
         "No se pudo registrar tu reserva porque ya tenés el máximo de reservas permitidas para ese día. 😔\n\n" +
-        "Si necesitás ayuda comunicate con el restaurante al *+54 9 2262 518504*."
+        "Si necesitás ayuda comunicate con el restaurante al *+54 9 2262 518504*.", cid
       );
     } else if (status === 400 && msg.includes("disponibilidad")) {
       await enviarMensajeTexto(
         from,
         "Lo sentimos, no hay disponibilidad para ese turno y fecha. 😔\n\n" +
-        "Comunicate con el restaurante al *+54 9 2262 518504*."
+        "Comunicate con el restaurante al *+54 9 2262 518504*.", cid
       );
     } else {
       await enviarMensajeTexto(
         from,
-        "Hubo un problema al registrar tu reserva. Por favor comunicate directamente con el restaurante al *+54 9 2262 518504*."
+        "Hubo un problema al registrar tu reserva. Por favor comunicate directamente con el restaurante al *+54 9 2262 518504*.", cid
       );
     }
 
@@ -1197,7 +1228,7 @@ async function procesarReservaConSenia(from, sesion) {
   }
 }
 
-async function confirmarModificacion(from, sesion) {
+async function confirmarModificacion(from, sesion, cid = null) {
   const reserva = sesion.datos.reservaAModificar;
   const fechaDisplay = formatearFecha(reserva.fecha);
 
@@ -1219,11 +1250,11 @@ async function confirmarModificacion(from, sesion) {
     `🕐 Horario actual: ${calcularTurnoLabel(reserva.turno)}\n` +
     `👥 Personas actuales: ${reserva.cantidad_personas}\n\n` +
     `${cambioTexto}\n\n` +
-    `*1.* Confirmar ✅\n*2.* Cancelar ❌`
+    `*1.* Confirmar ✅\n*2.* Cancelar ❌`, cid
   );
 }
 
-async function ejecutarModificacion(from, sesion) {
+async function ejecutarModificacion(from, sesion, cid = null) {
   const reserva = sesion.datos.reservaAModificar;
 
   const nuevaFecha    = sesion.datos.nuevaFecha    || reserva.fecha;
@@ -1253,7 +1284,7 @@ async function ejecutarModificacion(from, sesion) {
       `🕐 Turno: ${nuevoLabel}\n` +
       `👥 Personas: ${nuevaCantidad}\n\n` +
       `⏰ Recordá la tolerancia de 15-20 minutos.\n\n` +
-      `Si necesitás algo más, escribí *1* para volver al menú de reservas.`
+      `Si necesitás algo más, escribí *1* para volver al menú de reservas.`, cid
     );
   } catch (err) {
     const status = err.response?.status;
@@ -1265,18 +1296,18 @@ async function ejecutarModificacion(from, sesion) {
       await enviarMensajeTexto(
         from,
         "Lo sentimos, no hay disponibilidad para el nuevo turno/fecha. 😔\n\n" +
-        "Tu reserva original *no fue modificada*. Escribí *1* para intentar con otra opción."
+        "Tu reserva original *no fue modificada*. Escribí *1* para intentar con otra opción.", cid
       );
     } else if (status === 400 && msg.includes("Límite")) {
       await enviarMensajeTexto(
         from,
         "No se pudo modificar la reserva porque ya tenés el máximo de reservas permitidas para ese día. 😔\n\n" +
-        "Tu reserva original *no fue modificada*. Escribí *1* para volver al menú de reservas."
+        "Tu reserva original *no fue modificada*. Escribí *1* para volver al menú de reservas.", cid
       );
     } else {
       await enviarMensajeTexto(
         from,
-        "Hubo un problema al modificar la reserva. Por favor comunicate con el restaurante."
+        "Hubo un problema al modificar la reserva. Por favor comunicate con el restaurante.", cid
       );
     }
 
