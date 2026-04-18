@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const { testConnection } = require('./db');
 const reservasRouter = require('./routes/reservas');
 const webhookRoutes = require('./routes/webhook');
+const chatwootBotRouter = require('./routes/chatwootBot');
 const authRouter = require('./routes/auth');
 const diasCerradosRouter = require('./routes/diasCerrados');
 const app = express();
@@ -30,6 +31,7 @@ testConnection();
 // Rutas
 app.use('/dias-cerrados', diasCerradosRouter);
 app.use('/reservas', reservasRouter);
+app.use('/chatwoot-bot', chatwootBotRouter);
 app.use('/', webhookRoutes);
 app.use('/auth', authRouter);
 
