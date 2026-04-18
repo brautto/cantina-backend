@@ -68,6 +68,11 @@ async function enviarMensajePorChatwoot(conversationId, mensaje) {
 }
 
 async function enviarMensajeTexto(to, body, conversationId = null) {
+  if (conversationId) {
+    await enviarMensajePorChatwoot(conversationId, body);
+    return;
+  }
+  
   const toNormalizado = normalizarTelefono(to);
   const url = `https://graph.facebook.com/v23.0/${process.env.WHATSAPP_PHONE_ID}/messages`;
 
