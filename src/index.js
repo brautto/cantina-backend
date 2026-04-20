@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const cron = require('node-cron');
 const { enviarRecordatorios } = require('./jobs/recordatorioReservas');
+const { router: chatwootEventsRouter } = require('./routes/chatwootEvents');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -29,6 +30,7 @@ app.get('/', (req, res) => {
 testConnection();
 
 // Rutas
+app.use('/chatwoot-events', chatwootEventsRouter);
 app.use('/dias-cerrados', diasCerradosRouter);
 app.use('/reservas', reservasRouter);
 app.use('/chatwoot-bot', chatwootBotRouter);

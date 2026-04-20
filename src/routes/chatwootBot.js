@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { manejarMensajeEntrante } = require('../bot/whatsapp');
+const { estaEnModoHumano } = require('./chatwootEvents');
 
 router.post('/', async (req, res) => {
   res.sendStatus(200);
@@ -12,10 +13,16 @@ router.post('/', async (req, res) => {
     if (message_type !== 'incoming') return;
     if (!content) return;
 
+    const conversationId = conversation?.id;
+
+    // Si está en modo humano, el bot no responde
+    if (conversationId && estaEnModoHumano(conversationId)) {
+      console.log(`[BOT] Silenciado — conversación ${conversationId} en modo humano`);
+      return;
+    }
+
     const telefono = sender?.phone_number?.replace(/\D/g, '');
     if (!telefono) return;
-
-    const conversationId = conversation?.id;
 
     const message = {
       from: telefono,
