@@ -66,6 +66,7 @@ Cliente (WhatsApp)
 ![Bot - Confirmación de reserva](docs/bot-flow-2.png)
 
 ### Bot de WhatsApp – Flujo de seña para grupos
+![Bot - Inicio flujo grupo](docs/bot-senia-0.png)
 ![Bot - Solicitud de seña](docs/bot-senia-1.png)
 ![Bot - Verificación de seña](docs/bot-senia-2.png)
 
